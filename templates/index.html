@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Educativo: Muestreo de Señales y Teorema de Nyquist-Shannon</title>
+    
+    <!-- Plotly.js para gráficos interactivos -->
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    
+    <!-- Estilos personalizados -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <!-- ==========================================
+         ENCABEZADO
+    ========================================== -->
+    <header class="encabezado">
+        <div class="contenedor-encabezado">
+            <div style="font-size: 0.85em; color: #ffd700; margin-bottom: 8px; font-weight: bold;">
+                📚 Comunicaciones y Redes Industriales
+            </div>
+            <h1>🌊 Dashboard Educativo</h1>
+            <p>Procesamiento Digital de Señales: Muestreo y Teorema de Nyquist-Shannon</p>
+        </div>
+    </header>
+
+    <!-- ==========================================
+         CONTENEDOR PRINCIPAL
+    ========================================== -->
+    <div class="contenedor-principal">
+        
+        <!-- ==========================================
+             PANEL DE CONTROLES (SIDEBAR)
+        ========================================== -->
+        <aside class="panel-controles">
+            <h2>⚙️ Controles</h2>
+            
+            <!-- Selector de Escenarios -->
+            <div class="control-grupo escenarios-selector">
+                <label for="selector-escenarios">
+                    🎓 Escenarios Predefinidos
+                </label>
+                <select id="selector-escenarios" class="selector-escenarios">
+                    <option value="">-- Selecciona un escenario --</option>
+                    <option value="cd-audio">🎵 CD de Audio (44.1 kHz)</option>
+                    <option value="telefonia">📞 Telefonía (8 kHz)</option>
+                    <option value="nyquist-cumplido">✅ Nyquist Cumplido</option>
+                    <option value="nyquist-limite">⚠️ Nyquist Límite</option>
+                    <option value="aliasing-severo">❌ Aliasing Severo</option>
+                    <option value="sobremuestreo">🔍 Sobremuestreo</option>
+                    <option value="personalizado">🎮 Personalizado (Manual)</option>
+                </select>
+                <div id="descripcion-escenario" class="descripcion-escenario" style="margin-top: 8px; font-size: 0.85em; color: #666; line-height: 1.4;"></div>
+            </div>
+
+            <hr style="margin: 15px 0; border: none; border-top: 1px solid #ddd;">
+            
+            <!-- Amplitud -->
+            <div class="control-grupo">
+                <label for="amplitud">
+                    📏 Amplitud
+                    <span class="valor-actual" id="valor-amplitud">1.0</span>
+                </label>
+                <input 
+                    type="range" 
+                    id="amplitud" 
+                    min="0.5" 
+                    max="5.0" 
+                    step="0.1" 
+                    value="1.0"
+                    class="slider"
+                >
+                <div class="ayuda">Altura máxima de la onda</div>
+            </div>
+
+            <!-- Frecuencia de la Señal -->
+            <div class="control-grupo">
+                <label for="frecuencia">
+                    📶 Frecuencia Señal (f)
+                    <span class="valor-actual" id="valor-frecuencia">1.0</span> Hz
+                </label>
+                <input 
+                    type="range" 
+                    id="frecuencia" 
+                    min="0.5" 
+                    max="5.0" 
+                    step="0.1" 
+                    value="1.0"
+                    class="slider"
+                >
+                <div class="ayuda">Ciclos por segundo</div>
+            </div>
+
+            <!-- Frecuencia de Muestreo -->
+            <div class="control-grupo">
+                <label for="frecuencia-muestreo">
+                    📊 Frecuencia Muestreo (fs)
+                    <span class="valor-actual" id="valor-fs">10.0</span> Hz
+                </label>
+                <input 
+                    type="range" 
+                    id="frecuencia-muestreo" 
+                    min="0.5" 
+                    max="20.0" 
+                    step="0.5" 
+                    value="10.0"
+                    class="slider"
+                >
+                <div class="ayuda">Muestras por segundo</div>
+            </div>
+
+            <!-- Botón Actualizar -->
+            <button id="btn-actualizar" class="boton-actualizar">
+                🔄 Actualizar Gráfico
+            </button>
+
+            <!-- Información Nyquist -->
+            <div class="seccion-info">
+                <h3>📚 Información Nyquist</h3>
+                <div id="info-nyquist" class="info-nyquist">
+                    <p class="cargando">Cargando...</p>
+                </div>
+            </div>
+
+            <!-- Explicación Pedagógica -->
+            <div class="seccion-explicacion">
+                <h3>💡 Conceptos Clave</h3>
+                <div class="explicacion">
+                    <p><strong>📊 MUESTREO:</strong></p>
+                    <p style="font-size: 0.9em; margin-bottom: 8px;">Captura de valores de una señal continua a intervalos regulares (Ts = 1/fs)</p>
+                    
+                    <p><strong>🔢 TEOREMA NYQUIST:</strong></p>
+                    <p style="font-size: 0.9em; margin-bottom: 8px;">fs ≥ 2×f → Reconstrucción exacta de la señal original</p>
+                    
+                    <p><strong>⚠️ ALIASING:</strong></p>
+                    <p style="font-size: 0.9em; margin-bottom: 8px;">Error cuando fs &lt; 2×f → Genera frecuencia fantasma (IRREVERSIBLE)</p>
+                    
+                    <p><strong>🔄 REGENERACIÓN:</strong></p>
+                    <p style="font-size: 0.9em;">Si Nyquist ✅: Se pueden interpolar los valores entre muestras usando funciones sinc</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ==========================================
+             ÁREA DE GRÁFICOS
+        ========================================== -->
+        <main class="area-graficos">
+            <!-- Gráfico 1: Señal Continua vs Muestras -->
+            <div class="grafico-contenedor">
+                <h3>📈 Señal Continua y Muestras Discretas</h3>
+                <div id="grafico-principal" class="grafico"></div>
+                <div class="leyenda-grafico">
+                    <span class="leyenda-linea continua">─ Señal Continua (Analógica)</span>
+                    <span class="leyenda-puntos">● Muestras Discretas</span>
+                </div>
+            </div>
+
+            <!-- Gráfico 2: Señal Alias (cuando aplica) -->
+            <div class="grafico-contenedor" id="contenedor-alias" style="display: none;">
+                <h3>⚠️ Efecto de Aliasing</h3>
+                <div id="grafico-alias" class="grafico"></div>
+                <div class="leyenda-grafico">
+                    <span class="leyenda-linea original">─ Señal Original</span>
+                    <span class="leyenda-linea alias">─ Señal Alias (Falsa)</span>
+                </div>
+            </div>
+
+            <!-- Información Técnica Adicional -->
+            <div class="grafico-contenedor">
+                <h3>📖 Información Técnica y Educativa</h3>
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 0.95em; line-height: 1.7;">
+                    
+                    <details style="margin-bottom: 15px;">
+                        <summary style="cursor: pointer; font-weight: bold; color: #667eea;">
+                            📊 ¿Qué es el Muestreo?
+                        </summary>
+                        <div style="padding: 10px 0; margin-top: 10px; border-top: 1px solid #ddd;">
+                            <p>El <strong>muestreo</strong> es el proceso de capturar valores discretos de una señal continua (analógica) a intervalos regulares de tiempo.</p>
+                            <p style="margin-top: 8px;"><strong>Intervalo de muestreo:</strong> Ts = 1/fs (segundos)</p>
+                            <p style="margin-top: 8px;"><strong>Ejemplo:</strong> En un CD de audio (fs = 44.1 kHz), se toman 44,100 muestras por segundo</p>
+                        </div>
+                    </details>
+
+                    <details style="margin-bottom: 15px;">
+                        <summary style="cursor: pointer; font-weight: bold; color: #667eea;">
+                            🔢 ¿Qué es la Cuantificación?
+                        </summary>
+                        <div style="padding: 10px 0; margin-top: 10px; border-top: 1px solid #ddd;">
+                            <p>La <strong>cuantificación</strong> es el proceso de convertir las muestras (números reales con precisión infinita) a valores discretos que puedan representarse con un número finito de bits.</p>
+                            
+                            <p style="margin-top: 10px;"><strong>⚙️ Niveles de Cuantificación:</strong> 2^N (donde N = número de bits)</p>
+                            <ul style="margin-top: 8px; margin-left: 20px; font-size: 0.9em;">
+                                <li><strong>8 bits:</strong> 256 niveles (telefonía, calidad baja)</li>
+                                <li><strong>16 bits:</strong> 65,536 niveles (CD de audio estándar)</li>
+                                <li><strong>24 bits:</strong> 16.7 millones de niveles (audio profesional, Hi-Fi)</li>
+                                <li><strong>32 bits:</strong> 4.3 mil millones de niveles (audio de estudio, procesamiento)</li>
+                            </ul>
+                            
+                            <p style="margin-top: 10px;"><strong>📏 Paso de Cuantificación (q):</strong> Diferencia mínima entre niveles posibles</p>
+                            <p style="margin-top: 6px; font-family: monospace; background: #e8eaf6; padding: 8px; border-radius: 4px; font-size: 0.85em;">
+                                q = (V<sub>máx</sub> - V<sub>mín</sub>) / 2^N
+                            </p>
+                            
+                            <p style="margin-top: 10px;"><strong>⚠️ Error de Cuantificación:</strong> Diferencia inevitable entre el valor real y el valor cuantificado</p>
+                            <ul style="margin-top: 8px; margin-left: 20px; font-size: 0.9em;">
+                                <li>Rango: -q/2 a +q/2</li>
+                                <li><strong>Ruido de cuantificación:</strong> Error uniformemente distribuido</li>
+                                <li>Potencia de ruido: P<sub>ruido</sub> = q² / 12</li>
+                                <li><strong>IMPORTANTE:</strong> Este error es IRREVERSIBLE (no se puede eliminar después)</li>
+                            </ul>
+                            
+                            <p style="margin-top: 10px;"><strong>📊 Relación Señal-Ruido (SNR):</strong></p>
+                            <p style="margin-top: 6px; font-family: monospace; background: #e8eaf6; padding: 8px; border-radius: 4px; font-size: 0.85em;">
+                                SNR ≈ 6.02 × N dB (para N bits)
+                            </p>
+                            <p style="margin-top: 6px; font-size: 0.9em;">Ejemplo: 16 bits ≈ 96.3 dB</p>
+                        </div>
+                    </details>
+
+                    <details style="margin-bottom: 15px;">
+                        <summary style="cursor: pointer; font-weight: bold; color: #667eea;">
+                            🔄 ¿Cómo se Regenera la Señal?
+                        </summary>
+                        <div style="padding: 10px 0; margin-top: 10px; border-top: 1px solid #ddd;">
+                            <p>Si se cumple el <strong>Teorema de Nyquist</strong> (fs ≥ 2×f), la señal original se puede <strong>reconstruir perfectamente</strong> a partir de las muestras discretas.</p>
+                            
+                            <p style="margin-top: 10px;"><strong>🎯 Condición Fundamental:</strong></p>
+                            <p style="margin-top: 6px; font-family: monospace; background: #e8eaf6; padding: 8px; border-radius: 4px; font-size: 0.85em;">
+                                fs ≥ 2 × f<sub>máx</sub> → Reconstrucción perfecta posible
+                            </p>
+                            
+                            <p style="margin-top: 10px;"><strong>📐 Método Teórico: Interpolación Sinc</strong></p>
+                            <p style="margin-top: 6px; font-size: 0.9em;">La señal original se recupera mediante la suma infinita:</p>
+                            <p style="margin-top: 6px; font-family: monospace; background: #e8eaf6; padding: 8px; border-radius: 4px; font-size: 0.85em;">
+                                x(t) = Σ x[n] × sinc(π(t - nTs)/Ts)
+                            </p>
+                            <p style="margin-top: 6px; font-size: 0.9em;">donde sinc(x) = sin(πx)/(πx)</p>
+                            
+                            <p style="margin-top: 10px;"><strong>⚡ Filtro de Reconstrucción Ideal:</strong></p>
+                            <ul style="margin-top: 8px; margin-left: 20px; font-size: 0.9em;">
+                                <li><strong>Tipo:</strong> Filtro paso-bajo ideal</li>
+                                <li><strong>Frecuencia de corte:</strong> fc = fs/2</li>
+                                <li><strong>Respuesta al impulso:</strong> Función sinc en el tiempo</li>
+                                <li><strong>Efecto:</strong> Interpola perfectamente entre muestras</li>
+                            </ul>
+                            
+                            <p style="margin-top: 10px;"><strong>⚠️ Limitaciones Prácticas:</strong></p>
+                            <ul style="margin-top: 8px; margin-left: 20px; font-size: 0.9em;">
+                                <li><strong>Filtro ideal no es realizable:</strong> Sería infinitamente complicado</li>
+                                <li><strong>Delays inherentes:</strong> Latencia en la reconstrucción</li>
+                                <li><strong>Rizado (ripple):</strong> Oscilaciones cerca de discontinuidades</li>
+                                <li><strong>Error de cuantificación:</strong> Persiste en la señal reconstruida</li>
+                            </ul>
+                            
+                            <p style="margin-top: 10px;"><strong>🔌 Implementación Práctica: DAC (Digital-to-Analog Converter)</strong></p>
+                            <ul style="margin-top: 8px; margin-left: 20px; font-size: 0.9em;">
+                                <li><strong>Paso 1 (Hold):</strong> Mantiene valor constante durante Ts</li>
+                                <li><strong>Paso 2 (DAC):</strong> Convierte código digital a voltaje analógico</li>
+                                <li><strong>Paso 3 (Filtro paso-bajo):</strong> Suaviza escalonamiento (smoothing)</li>
+                                <li><strong>Resultado:</strong> Aproximación cercana a la señal original</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <details>
+                        <summary style="cursor: pointer; font-weight: bold; color: #667eea;">
+                            📐 Proceso Completo: A/D → Procesamiento → D/A
+                        </summary>
+                        <div style="padding: 10px 0; margin-top: 10px; border-top: 1px solid #ddd;">
+                            
+                            <p style="margin-bottom: 12px;"><strong>🔗 Cadena Completa de Conversión Analógica-Digital-Analógica:</strong></p>
+                            
+                            <p style="margin-top: 10px;"><strong>SECCIÓN A → D (Conversión Analógica a Digital):</strong></p>
+                            <div style="margin-top: 8px; background: #fff3e0; padding: 10px; border-left: 4px solid #ff9800; border-radius: 4px;">
+                                <p style="margin: 0;"><strong>① Filtrado Anti-Aliasing:</strong> Filtro paso-bajo analógico antes de muestrear</p>
+                                <p style="margin: 6px 0 0 0; font-size: 0.9em; color: #555;">
+                                    • Frecuencia de corte: fs/2 (Frecuencia de Nyquist)<br>
+                                    • Propósito: Eliminar componentes > fs/2 para evitar aliasing<br>
+                                    • Tipo: Butterworth, Chebyshev o similar
+                                </p>
+                            </div>
+                            
+                            <div style="margin-top: 10px; background: #fff3e0; padding: 10px; border-left: 4px solid #ff9800; border-radius: 4px;">
+                                <p style="margin: 0;"><strong>② Muestreo (Sample &amp; Hold):</strong> Captura instantánea de la señal a frecuencia fs</p>
+                                <p style="margin: 6px 0 0 0; font-size: 0.9em; color: #555;">
+                                    • Período: Ts = 1/fs<br>
+                                    • Realiza: x[n] = x(nTs) para n = 0, 1, 2, ...<br>
+                                    • Resultado: Secuencia discreta en tiempo
+                                </p>
+                            </div>
+                            
+                            <div style="margin-top: 10px; background: #fff3e0; padding: 10px; border-left: 4px solid #ff9800; border-radius: 4px;">
+                                <p style="margin: 0;"><strong>③ Cuantificación (ADC):</strong> Convierte amplitudes reales a N bits (discretización en amplitud)</p>
+                                <p style="margin: 6px 0 0 0; font-size: 0.9em; color: #555;">
+                                    • Niveles posibles: 2^N<br>
+                                    • Resolución: q = Rango / 2^N<br>
+                                    • Error: -q/2 ≤ error ≤ +q/2
+                                </p>
+                            </div>
+                            
+                            <p style="margin-top: 15px;"><strong>SECCIÓN DIGITAL (Procesamiento):</strong></p>
+                            <div style="margin-top: 8px; background: #e3f2fd; padding: 10px; border-left: 4px solid #2196f3; border-radius: 4px;">
+                                <p style="margin: 0;"><strong>④ Procesamiento Digital:</strong> Algoritmos, filtros, transformadas, etc.</p>
+                                <p style="margin: 6px 0 0 0; font-size: 0.9em; color: #555;">
+                                    • FFT, convoluciones, filtros digitales<br>
+                                    • Compresión, análisis espectral, etc.<br>
+                                    • Totalmente reversible: sin pérdida de precisión (excepto redondeo)
+                                </p>
+                            </div>
+                            
+                            <p style="margin-top: 15px;"><strong>SECCIÓN D → A (Conversión Digital a Analógica):</strong></p>
+                            <div style="margin-top: 8px; background: #f3e5f5; padding: 10px; border-left: 4px solid #9c27b0; border-radius: 4px;">
+                                <p style="margin: 0;"><strong>⑤ Reconstrucción (DAC):</strong> Convierte código N-bits a voltaje analógico</p>
+                                <p style="margin: 6px 0 0 0; font-size: 0.9em; color: #555;">
+                                    • Realiza: x(t) ≈ Σ x[n] × rect[(t - nTs)/Ts]<br>
+                                    • Produce: Escalones (step function) con pendientes verticales<br>
+                                    • Limitación: No es exactamente la sinc teórica
+                                </p>
+                            </div>
+                            
+                            <div style="margin-top: 10px; background: #f3e5f5; padding: 10px; border-left: 4px solid #9c27b0; border-radius: 4px;">
+                                <p style="margin: 0;"><strong>⑥ Filtrado Post-Reconstrucción:</strong> Filtro paso-bajo analógico de salida</p>
+                                <p style="margin: 6px 0 0 0; font-size: 0.9em; color: #555;">
+                                    • Propósito: Suavizar escalones (smoothing filter)<br>
+                                    • Frecuencia de corte: Menor a fs/2<br>
+                                    • Acerca la forma a la sinc ideal<br>
+                                    • Resultado: Señal analógica aproximada a la original
+                                </p>
+                            </div>
+                            
+                            <p style="margin-top: 15px;"><strong>📊 Diagrama Esquemático:</strong></p>
+                            <p style="margin-top: 8px; font-family: monospace; background: #f0f0f0; padding: 12px; border-radius: 4px; font-size: 0.85em; overflow-x: auto; line-height: 1.6;">
+x(t) → [AA Filt] → [S&H] → [ADC] → [DIGITAL] → [DAC] → [AA Filt] → x'(t)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Analógica  Analógica  Bits    N-bits  Procesam.  Analógica  Analógica
+                            </p>
+                            
+                            <p style="margin-top: 15px;"><strong>⚠️ Fuentes de Error en el Proceso Completo:</strong></p>
+                            <ul style="margin-top: 8px; margin-left: 20px; font-size: 0.9em;">
+                                <li><strong>Aliasing:</strong> Si fs &lt; 2×fmax → IRREVERSIBLE, distorsión permanente</li>
+                                <li><strong>Cuantificación:</strong> Error inherente ≈ q/√12 RMS → IRREVERSIBLE</li>
+                                <li><strong>Filtros no ideales:</strong> Atenuación, fase, rizado</li>
+                                <li><strong>Jitter de muestreo:</strong> Variaciones en Ts → Distorsión</li>
+                                <li><strong>Errores de redondeo:</strong> Acumulación en procesamiento digital</li>
+                            </ul>
+                            
+                            <p style="margin-top: 15px;"><strong>✅ Calidad Final Lograda (Nyquist cumplido):</strong></p>
+                            <p style="font-size: 0.9em; margin-top: 8px;">x'(t) ≈ x(t) + ε<sub>total</sub></p>
+                            <p style="font-size: 0.9em; margin-top: 6px;">donde εtotal = εaliasing + εcuantificación + εfiltros + εjitter + ...</p>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ==========================================
+         PIE DE PÁGINA
+    ========================================== -->
+    <footer class="pie-pagina">
+        <p>🎓 Dashboard Educativo | Procesamiento Digital de Señales | 2024</p>
+        <p style="font-size: 0.9em; margin-top: 5px;">Movimiento de sliders = Actualización en tiempo real ⚡</p>
+    </footer>
+
+    <!-- Script principal -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    
+    <!-- Validación de carga -->
+    <script>
+        // Verificar que Plotly se haya cargado
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof Plotly === 'undefined') {
+                console.error('❌ Plotly.js no se cargó correctamente');
+                alert('⚠️ Error: Plotly.js no se cargó. Las gráficas no se mostrarán.');
+            } else {
+                console.log('✅ Plotly.js cargado correctamente');
+            }
+        });
+    </script>
+</body>
+</html>
